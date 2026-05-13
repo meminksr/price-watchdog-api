@@ -15,7 +15,6 @@ public class ProductController {
         this.productService = productService;
     }
 
-    // Bu sefer veri kaydedeceğimiz için @GetMapping değil @PostMapping kullanıyoruz
     @PostMapping("/add")
     public Product addProduct(@RequestParam String name,
                               @RequestParam String url,

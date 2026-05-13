@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Entity
-@Data // Lombok ile getter/setter otomatik oluşur
+@Data
 public class Product {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -16,10 +16,9 @@ public class Product {
     private String name;
     private String url;
     private String cssSelector;
-    private BigDecimal targetPrice; // Kullanıcı bu fiyatın altına düşerse haber ver diyecek
-    private BigDecimal lastPrice;   // En son çekilen fiyat
+    private BigDecimal targetPrice;
+    private BigDecimal lastPrice;
 
-    // Bir ürünün birden fazla fiyat geçmişi olabilir
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
     private List<PriceHistory> priceHistories;
 }

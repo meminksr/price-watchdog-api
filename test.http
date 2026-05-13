@@ -2,4 +2,4 @@
 POST http://localhost:8080/api/products/add
 Content-Type: application/x-www-form-urlencoded
 
-name=Test Kitabi&url=http://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html&selector=p.price_color&targetPrice=40.00
+name=Test Kitabi&url=http://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html&selector=p.price_color&targetPrice=60.00

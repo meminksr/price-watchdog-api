@@ -1,77 +1,40 @@
 package com.meminksr.pricewatchdogapi.service;
 
-
-import com.meminksr.pricewatchdogapi.entity.PriceHistory;
+import com.meminksr.pricewatchdogapi.config.RabbitMQConfig;
 import com.meminksr.pricewatchdogapi.entity.Product;
-import com.meminksr.pricewatchdogapi.repository.PriceHistoryRepository;
 import com.meminksr.pricewatchdogapi.repository.ProductRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 public class PriceUpdateScheduler {
 
-    private final ProductRepository productRepository;
-    private final PriceHistoryRepository priceHistoryRepository;
-    private final PriceScraperService priceScraperService;
+    private static final Logger log = LoggerFactory.getLogger(PriceUpdateScheduler.class);
 
-    public PriceUpdateScheduler(ProductRepository productRepository,
-                                PriceHistoryRepository priceHistoryRepository,
-                                PriceScraperService priceScraperService) {
+    private final ProductRepository productRepository;
+    private final RabbitTemplate rabbitTemplate;
+
+    public PriceUpdateScheduler(ProductRepository productRepository, RabbitTemplate rabbitTemplate) {
         this.productRepository = productRepository;
-        this.priceHistoryRepository = priceHistoryRepository;
-        this.priceScraperService = priceScraperService;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
-    // fixedRate = 30000 demek, bu metodu her 30 saniyede bir (30.000 milisaniye) otomatik çalıştır demektir.
-    // Canlıya alırken bunu örneğin her saat başı yapacak şekilde (@Scheduled(cron = "0 0 * * * *")) değiştireceğiz.
+    // It will run every 30 seconds and add tasks to the queue
     @Scheduled(fixedRate = 30000)
-    @Transactional
-    public void updateAllPrices() {
-        System.out.println("--- Otomatik Fiyat Kontrolü Başladı (" + LocalDateTime.now() + ") ---");
+    public void queueProductsForUpdate() {
 
-        // 1. Veritabanındaki tüm ürünleri getir
+        log.info("--- Scheduler Ran: Tasks Are Being Added to the Queue ---");
+
         List<Product> products = productRepository.findAll();
 
-        // 2. Her bir ürün için dön
         for (Product product : products) {
-            try {
-                // Siteden anlık fiyatı çek
-                BigDecimal currentPrice = priceScraperService.scrapePrice(product.getUrl(), product.getCssSelector());
-                BigDecimal lastPrice = product.getLastPrice();
-
-                // 3. Eğer fiyat eskisinden farklıysa güncelleme yap
-                if (currentPrice.compareTo(lastPrice) != 0) {
-                    System.out.println("🚨 Fiyat Değişimi Tespit Edildi! Ürün: " + product.getName() + " | Eski: " + lastPrice + " -> Yeni: " + currentPrice);
-
-                    // Ürünün son fiyatını güncelle
-                    product.setLastPrice(currentPrice);
-                    productRepository.save(product);
-
-                    // Tarihçeye yeni bir kayıt at
-                    PriceHistory newHistory = new PriceHistory();
-                    newHistory.setProduct(product);
-                    newHistory.setPrice(currentPrice);
-                    newHistory.setTimestamp(LocalDateTime.now());
-                    priceHistoryRepository.save(newHistory);
-
-                    // Eğer fiyat hedeflenen fiyatın altındaysa (Şimdilik sadece konsola yazıyoruz, bildirim sistemini sonra yapacağız)
-                    if (currentPrice.compareTo(product.getTargetPrice()) <= 0) {
-                        System.out.println("🎉 HEDEF FİYATA ULAŞILDI! Kullanıcıya e-posta gönderilecek: " + product.getName());
-                    }
-                } else {
-                    System.out.println("✅ " + product.getName() + " için fiyat aynı kaldı: " + currentPrice);
-                }
-
-            } catch (Exception e) {
-                System.out.println("❌ Ürün kontrol edilirken hata oluştu: " + product.getName() + " - Hata: " + e.getMessage());
-            }
+            rabbitTemplate.convertAndSend(RabbitMQConfig.QUEUE_NAME, product.getId());
+            log.info("📦 A message has been added to the queue -> Product ID: {}", product.getId());
         }
-        System.out.println("--- Kontrol Tamamlandı ---");
     }
 }

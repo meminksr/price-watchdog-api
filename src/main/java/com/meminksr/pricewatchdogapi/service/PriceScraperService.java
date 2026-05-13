@@ -6,7 +6,7 @@ import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.math.BigDecimal; // BigDecimal kütüphanesini import ettik
+import java.math.BigDecimal;
 
 @Service
 public class PriceScraperService {
@@ -21,14 +21,14 @@ public class PriceScraperService {
             Element priceElement = document.selectFirst(cssSelector);
 
             if (priceElement != null) {
-                String rawPriceText = priceElement.text(); // Örn: "£51.77" veya "1.250,00 TL"
-                return parsePriceText(rawPriceText); // Temizleme metodumuza gönderiyoruz
+                String rawPriceText = priceElement.text();
+                return parsePriceText(rawPriceText); // We are sending it to our cleaning department
             } else {
-                throw new RuntimeException("Fiyat elementi bulunamadı!");
+                throw new RuntimeException("The price element could not be found!");
             }
 
         } catch (IOException e) {
-            throw new RuntimeException("Sayfaya bağlanırken hata oluştu: " + e.getMessage());
+            throw new RuntimeException("An error occurred while loading the page: " + e.getMessage());
         }
     }
 
@@ -39,29 +39,21 @@ public class PriceScraperService {
         if (priceText == null || priceText.isBlank()) {
             return BigDecimal.ZERO;
         }
-
-        // 1. Harfleri, para birimi sembollerini ve boşlukları temizle (Sadece rakam, virgül ve nokta kalsın)
-        // Regex (Düzenli İfade) kullanarak 0-9, nokta ve virgül dışındaki her şeyi siliyoruz.
         String cleaned = priceText.replaceAll("[^0-9.,]", "");
 
-        // 2. Türk stili (1.250,50) ve Amerikan stili (1,250.50) karmaşasını çözme
         if (cleaned.contains(",") && cleaned.contains(".")) {
             int commaIndex = cleaned.indexOf(",");
             int dotIndex = cleaned.lastIndexOf(".");
 
             if (commaIndex > dotIndex) {
-                // Format: 1.250,50 (Türk stili) -> Binlik noktayı sil, kuruş virgülünü noktaya çevir
                 cleaned = cleaned.replace(".", "").replace(",", ".");
             } else {
-                // Format: 1,250.50 (Amerikan stili) -> Binlik virgülü sil
                 cleaned = cleaned.replace(",", "");
             }
         } else if (cleaned.contains(",")) {
-            // Sadece virgül varsa (örn: 1250,50) -> Virgülü noktaya çevir
             cleaned = cleaned.replace(",", ".");
         }
 
-        // 3. Artık elimizde "1250.50" formatında saf bir sayı metni var, bunu BigDecimal'e çeviriyoruz
         return new BigDecimal(cleaned);
     }
 }
